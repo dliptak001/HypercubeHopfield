@@ -80,7 +80,7 @@ public:
                     for (size_t p = 0; p < count; ++p)
                     {
                         const float* orig = patterns.data() + p * N;
-                        (void)CorruptPattern<N>(orig, noisy, noise, rng);
+                        CorruptPattern<N>(orig, noisy, noise, rng);
 
                         const size_t sweeps = net->Recall(noisy, 100);
                         total_overlap += ComputeOverlap<N>(orig, noisy);

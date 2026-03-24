@@ -1,7 +1,9 @@
 # HypercubeHopfield
 
-A Modern Hopfield network built on a Boolean hypercube graph, achieving exponential
-memory capacity through softmax-attention retrieval on structured sparse connectivity.
+A sparse local-attention variant of the Modern Hopfield network built on a Boolean
+hypercube graph. Uses softmax-attention retrieval with Hamming-ball connectivity for
+a deliberate tradeoff: lower per-update cost than fully-connected Hopfield networks
+while retaining capacity that scales super-linearly with dimension.
 
 Licensed under the [Apache License 2.0](LICENSE).
 

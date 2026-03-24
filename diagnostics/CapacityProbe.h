@@ -130,7 +130,7 @@ public:
 
                         // Each thread needs its own RNG for corruption
                         std::mt19937_64 thread_rng(seed * 10000 + count * 100 + p);
-                        (void)CorruptPattern<N>(orig, noisy, noise, thread_rng);
+                        CorruptPattern<N>(orig, noisy, noise, thread_rng);
 
                         const size_t sweeps = thread_net->Recall(noisy, 100);
                         const float overlap = ComputeOverlap<N>(orig, noisy);

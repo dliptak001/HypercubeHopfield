@@ -2,13 +2,27 @@
 
 ## Overview
 
-The `HopfieldNetwork<DIM>` implements a **Modern Hopfield network** (Ramsauer et al., 2021)
-on a DIM-dimensional Boolean hypercube with N = 2^DIM vertices (neurons).
+The `HopfieldNetwork<DIM>` implements a **sparse local-attention variant** of the
+Modern Hopfield network (Ramsauer et al., 2021) on a DIM-dimensional Boolean
+hypercube with N = 2^DIM vertices (neurons).
 
 Unlike classical Hopfield networks that collapse patterns into a weight matrix via
 Hebbian learning, the modern formulation stores patterns explicitly and uses
-exponential (softmax) interactions for retrieval. This achieves exponential memory
-capacity in N, far exceeding the classical ~0.14N limit.
+exponential (softmax) interactions for retrieval.
+
+### Distinction from Standard Modern Hopfield
+
+The standard formulation (Ramsauer et al.) uses **global attention**: the similarity
+between a pattern and the state is the full dot product across all N vertices, and
+the entire state vector is updated synchronously. This gives theoretical exponential
+capacity of O(2^(N/2)).
+
+This implementation uses **sparse local attention**: each vertex computes similarity
+using only its Hamming-ball neighbors (a subset of N), and vertices update
+asynchronously. This is a deliberate design choice — sparse connectivity trades
+some theoretical capacity for O(M × connections) per-vertex cost instead of O(M × N),
+enabling much larger networks. Empirically, the capacity is still far above the
+classical ~0.14N limit and scales super-linearly with DIM.
 
 ## Hypercube Connectivity
 
@@ -47,7 +61,7 @@ The `connectivity` parameter (0.0-1.0) truncates the sorted mask table:
 Since masks are sorted by distance, truncation always keeps the closest
 neighbors and drops the most distant ones first.
 
-## Update Rule (Modern Hopfield / Softmax Attention)
+## Update Rule (Sparse Local Attention)
 
 Each vertex stores a continuous-valued state s_v. The update at vertex v:
 
@@ -101,11 +115,20 @@ a weight matrix). This enables:
 
 ## Capacity
 
-Modern Hopfield networks achieve exponential capacity in N — up to exp(O(N))
-patterns can be stored and retrieved reliably. At DIM=8 with reach=4 and
-connectivity=1.0 (162 connections, 63% of N=256), the network stores 1000+
-patterns with perfect recall. Characterizing how capacity degrades with
-reduced connectivity is a key goal of this project.
+The standard fully-connected Modern Hopfield network achieves theoretical capacity
+of O(2^(N/2)). This sparse local-attention variant does not enjoy the same
+theoretical guarantees, but empirically demonstrates strong capacity that scales
+super-linearly with DIM:
+
+| DIM | N    | Connections | Capacity  |
+|-----|------|-------------|-----------|
+| 6   | 64   | 41          | 512       |
+| 7   | 128  | 63          | 32768     |
+| 8   | 256  | 162         | >= 65536  |
+
+At DIM=8, the network stores at least 256x its vertex count with perfect recall.
+Characterizing how capacity scales with connectivity and reach is a key goal
+of this project.
 
 ## References
 

@@ -7,11 +7,12 @@
 
 /// @brief Diagnostic: single-pattern recall at varying noise levels.
 ///
-/// Stores one pattern, corrupts it at 10%-50% noise, recalls, and measures
-/// overlap with the original. Averaged over 3 seeds. Tests that the network
-/// can reliably recover from noise — the fundamental Hopfield operation.
+/// Stores one continuous-valued pattern, corrupts it with Gaussian noise at
+/// increasing stddev (0.1-0.5), recalls, and measures cosine similarity with
+/// the original. Averaged over 3 seeds. Tests that the network can reliably
+/// recover from noise — the fundamental Hopfield operation.
 ///
-/// Pass criteria: overlap >= 0.95 at 10% noise, >= 0.90 at 20%, >= 0.80 at 30%.
+/// Pass criteria: cosine similarity >= 0.95 at 0.1 noise, >= 0.90 at 0.2, >= 0.80 at 0.3.
 template <size_t DIM>
 class NoiseRecall
 {
@@ -51,7 +52,7 @@ public:
                 net->StorePattern(pattern);
 
                 float noisy[N];
-                (void)CorruptPattern<N>(pattern, noisy, noise_levels[lvl], rng);
+                CorruptPattern<N>(pattern, noisy, noise_levels[lvl], rng);
 
                 const size_t sweeps = net->Recall(noisy, 100);
                 total_overlap += ComputeOverlap<N>(pattern, noisy);
@@ -88,10 +89,10 @@ private:
             std::fprintf(md, "# NoiseRecall Results\n\n");
             std::fprintf(md, "## What is NoiseRecall?\n\n");
             std::fprintf(md, "Measures the network's ability to recover a stored pattern from a noisy cue.\n");
-            std::fprintf(md, "A single pattern is stored, then corrupted at varying noise levels (percentage\n");
-            std::fprintf(md, "of elements negated). The network runs Recall() and the overlap (normalized dot\n");
-            std::fprintf(md, "product) between the recalled state and the original is measured. An overlap\n");
-            std::fprintf(md, "of 1.0 means perfect recall; 0.0 means uncorrelated.\n\n");
+            std::fprintf(md, "A single continuous-valued pattern is stored, then corrupted with Gaussian\n");
+            std::fprintf(md, "noise at increasing standard deviations. The network runs Recall() and the\n");
+            std::fprintf(md, "cosine similarity between the recalled state and the original is measured.\n");
+            std::fprintf(md, "A similarity of 1.0 means perfect recall; 0.0 means orthogonal.\n\n");
             std::fprintf(md, "---\n\n");
             std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=%zu | beta=4.0 | 3-seed avg {42,1042,2042}\n\n",
                          DIM, N, DIM / 2);

@@ -58,7 +58,7 @@ public:
             float noisy[N];
             for (size_t p = 0; p < num_patterns; ++p)
             {
-                (void)CorruptPattern<N>(patterns[p], noisy, noise, rng);
+                CorruptPattern<N>(patterns[p], noisy, noise, rng);
 
                 const size_t sweeps = net->Recall(noisy, 100);
                 total_target[p] += ComputeOverlap<N>(patterns[p], noisy);
