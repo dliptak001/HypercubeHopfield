@@ -12,6 +12,8 @@
 /// find the largest pattern count with mean overlap >= 0.90 at 20% noise before
 /// the first drop. Also reports average convergence sweeps at capacity.
 ///
+/// Grid cells are parallelized across threads via OMP.
+///
 /// This reveals how connectivity (reach) and retrieval sharpness (beta) interact
 /// on the hypercube topology. Informational — no pass/fail.
 template <size_t DIM>
@@ -28,6 +30,7 @@ public:
         constexpr float beta_vals[] = {1.0f, 2.0f, 4.0f, 8.0f, 16.0f};
         constexpr size_t num_reach = sizeof(reach_vals) / sizeof(reach_vals[0]);
         constexpr size_t num_beta = sizeof(beta_vals) / sizeof(beta_vals[0]);
+        constexpr size_t num_cells = num_reach * num_beta;
         constexpr float noise = 0.20f;
         constexpr float threshold = 0.90f;
 
@@ -37,7 +40,70 @@ public:
 
         PrintHeader(md, reach_vals, num_reach, beta_vals, num_beta);
 
-        // Column headers
+        // Flat arrays for grid results — filled in parallel
+        std::vector<size_t> grid_capacity(num_cells, 0);
+        std::vector<float> grid_sweeps(num_cells, 0.0f);
+
+        // Parallelize across all 25 grid cells
+        #pragma omp parallel for schedule(dynamic)
+        for (size_t cell = 0; cell < num_cells; ++cell)
+        {
+            const size_t r = cell / num_beta;
+            const size_t b = cell % num_beta;
+            const size_t reach = reach_vals[r];
+            const float beta = beta_vals[b];
+
+            size_t capacity = 0;
+            float cap_sweeps = 0.0f;
+            bool dropped = false;
+
+            // Mini capacity probe: 1,2,4,8,16,32,64
+            for (size_t count = 1; count <= 64; count *= 2)
+            {
+                float total_overlap = 0.0f;
+                float total_sweeps = 0.0f;
+                size_t total_tests = 0;
+
+                for (uint64_t seed : DiagSeeds())
+                {
+                    std::mt19937_64 rng(seed * 10000 + r * 1000 + b * 100 + count);
+                    auto net = HopfieldNetwork<DIM>::Create(rng(), reach, beta);
+
+                    std::vector<float> patterns(count * N);
+                    for (size_t p = 0; p < count; ++p)
+                        GenerateRandomPattern<N>(patterns.data() + p * N, rng);
+
+                    for (size_t p = 0; p < count; ++p)
+                        net->StorePattern(patterns.data() + p * N);
+
+                    float noisy[N];
+                    for (size_t p = 0; p < count; ++p)
+                    {
+                        const float* orig = patterns.data() + p * N;
+                        (void)CorruptPattern<N>(orig, noisy, noise, rng);
+
+                        const size_t sweeps = net->Recall(noisy, 100);
+                        total_overlap += ComputeOverlap<N>(orig, noisy);
+                        total_sweeps += static_cast<float>(sweeps);
+                        ++total_tests;
+                    }
+                }
+
+                const float mean_overlap = total_overlap / static_cast<float>(total_tests);
+                if (mean_overlap >= threshold && !dropped)
+                {
+                    capacity = count;
+                    cap_sweeps = total_sweeps / static_cast<float>(total_tests);
+                }
+                else if (mean_overlap < threshold)
+                    dropped = true;
+            }
+
+            grid_capacity[cell] = capacity;
+            grid_sweeps[cell] = cap_sweeps;
+        }
+
+        // Assemble and print results (sequential — Tee is not thread-safe)
         std::string hdr = "| reach |";
         std::string sep = "|-------|";
         for (size_t b = 0; b < num_beta; ++b)
@@ -50,59 +116,11 @@ public:
 
         for (size_t r = 0; r < num_reach; ++r)
         {
-            const size_t reach = reach_vals[r];
-            std::string row = Fmt("| %3d   |", static_cast<int>(reach));
-
+            std::string row = Fmt("| %3d   |", static_cast<int>(reach_vals[r]));
             for (size_t b = 0; b < num_beta; ++b)
             {
-                const float beta = beta_vals[b];
-                size_t capacity = 0;
-                float cap_sweeps = 0.0f;
-                bool dropped = false;
-
-                // Mini capacity probe: 1,2,4,8,16,32,64
-                for (size_t count = 1; count <= 64; count *= 2)
-                {
-                    float total_overlap = 0.0f;
-                    float total_sweeps = 0.0f;
-                    size_t total_tests = 0;
-
-                    for (uint64_t seed : DiagSeeds())
-                    {
-                        std::mt19937_64 rng(seed * 10000 + r * 1000 + b * 100 + count);
-                        auto net = HopfieldNetwork<DIM>::Create(rng(), reach, beta);
-
-                        std::vector<float> patterns(count * N);
-                        for (size_t p = 0; p < count; ++p)
-                            GenerateRandomPattern<N>(patterns.data() + p * N, rng);
-
-                        for (size_t p = 0; p < count; ++p)
-                            net->StorePattern(patterns.data() + p * N);
-
-                        float noisy[N];
-                        for (size_t p = 0; p < count; ++p)
-                        {
-                            const float* orig = patterns.data() + p * N;
-                            (void)CorruptPattern<N>(orig, noisy, noise, rng);
-
-                            const size_t sweeps = net->Recall(noisy, 100);
-                            total_overlap += ComputeOverlap<N>(orig, noisy);
-                            total_sweeps += static_cast<float>(sweeps);
-                            ++total_tests;
-                        }
-                    }
-
-                    const float mean_overlap = total_overlap / static_cast<float>(total_tests);
-                    if (mean_overlap >= threshold && !dropped)
-                    {
-                        capacity = count;
-                        cap_sweeps = total_sweeps / static_cast<float>(total_tests);
-                    }
-                    else if (mean_overlap < threshold)
-                        dropped = true;
-                }
-
-                row += Fmt(" %2d/%3.0f |", static_cast<int>(capacity), cap_sweeps);
+                const size_t cell = r * num_beta + b;
+                row += Fmt(" %2d/%3.0f |", static_cast<int>(grid_capacity[cell]), grid_sweeps[cell]);
             }
             Tee(md, row + "\n");
         }
@@ -129,10 +147,9 @@ private:
             std::fprintf(md, "# ParameterSweep Results\n\n");
             std::fprintf(md, "## What is ParameterSweep?\n\n");
             std::fprintf(md, "Characterizes how the two key parameters affect network capacity:\n");
-            std::fprintf(md, "- **reach** (1-%zu): number of Hamming-shell connections per vertex, added\n",
+            std::fprintf(md, "- **reach** (1-%zu): Hamming-ball radius controlling connectivity per vertex.\n",
                          reach_vals[num_reach - 1]);
-            std::fprintf(md, "  on top of DIM=%zu nearest-neighbor connections. More shells = richer\n", DIM);
-            std::fprintf(md, "  long-range context for the softmax attention mechanism.\n");
+            std::fprintf(md, "  Higher reach = more neighbors = richer context for softmax attention.\n");
             std::fprintf(md, "- **beta** (inverse temperature): controls softmax sharpness. Higher beta\n");
             std::fprintf(md, "  gives more winner-take-all retrieval; lower beta gives softer blending.\n\n");
             std::fprintf(md, "For each (reach, beta) pair, a mini capacity probe finds the largest\n");
@@ -154,7 +171,7 @@ private:
     {
         if (!md) return;
         std::fprintf(md, "\n## Findings\n\n");
-        std::fprintf(md, "- **Reach effect:** More Hamming shells provide richer local context for the\n");
+        std::fprintf(md, "- **Reach effect:** Higher Hamming-ball radius provides more neighbors for the\n");
         std::fprintf(md, "  softmax attention, generally increasing capacity — but with diminishing\n");
         std::fprintf(md, "  returns as the signal-to-noise ratio saturates.\n");
         std::fprintf(md, "- **Beta effect:** Higher beta sharpens retrieval (closer to winner-take-all),\n");

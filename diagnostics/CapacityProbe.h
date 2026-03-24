@@ -3,8 +3,9 @@
 #include "../HopfieldNetwork.h"
 #include "DiagnosticHelpers.h"
 
+#include <algorithm>
 #include <cstdio>
-#include <cstddef>
+#include <numeric>
 #include <vector>
 
 /// @brief Diagnostic: find empirical memory capacity by storing increasing patterns.
@@ -12,18 +13,22 @@
 /// Stores 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, ... patterns, corrupts each
 /// at 20% noise, recalls, and measures mean overlap. Capacity is the largest pattern
 /// count where mean overlap stays >= 0.90 before the first drop below threshold.
-/// This characterizes the network's fundamental storage limit at the current
-/// (DIM, reach, beta) configuration.
 ///
-/// Modern Hopfield networks theoretically achieve exponential capacity in N.
-/// This diagnostic measures the empirical capacity on the sparse hypercube topology.
+/// At high pattern counts, tests a random sample of patterns (default 64) rather
+/// than all M, reducing the cost from O(M^2) to O(M). The recall tests within
+/// each seed are parallelized across threads via OMP.
 template <size_t DIM>
 class CapacityProbe
 {
     static constexpr size_t N = 1ULL << DIM;
 
 public:
-    CapacityProbe() = default;
+    /// @param max_patterns Upper limit on patterns to test. Default 4*N is fast;
+    ///                     set higher (e.g., 256*N) to find the true ceiling.
+    /// @param max_test_samples Max patterns to test per count per seed. At counts
+    ///                         above this, a random sample is tested instead of all.
+    explicit CapacityProbe(size_t max_patterns = 4 * N, size_t max_test_samples = 64)
+        : max_patterns_(max_patterns), max_test_samples_(max_test_samples) {}
 
     bool RunAndPrint()
     {
@@ -34,48 +39,95 @@ public:
         if (!md)
             std::printf("  (warning: could not create diagnostics/CapacityProbe.md)\n");
 
-        PrintHeader(md);
+        PrintHeader(md, max_test_samples_);
 
         size_t capacity = 0;
         bool dropped = false;
 
         // Geometric progression: 1,2,3,4,6,8,12,16,24,32,48,64,128,...
         std::vector<size_t> counts = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64};
-        for (size_t c = 128; c <= 4 * N; c *= 2)
+        for (size_t c = 128; c <= max_patterns_; c *= 2)
             counts.push_back(c);
+        if (counts.back() < max_patterns_)
+            counts.push_back(max_patterns_);
 
         for (size_t count : counts)
         {
-            float total_overlap = 0.0f;
-            float min_overlap = 2.0f;
-            float total_sweeps = 0.0f;
-            size_t total_tests = 0;
+            const auto& seeds = DiagSeeds();
+            const size_t num_seeds = seeds.size();
+            const size_t test_count = std::min(count, max_test_samples_);
 
-            for (uint64_t seed : DiagSeeds())
+            // Per-seed accumulators
+            std::vector<float> seed_overlap(num_seeds, 0.0f);
+            std::vector<float> seed_min_ovlp(num_seeds, 2.0f);
+            std::vector<float> seed_sweeps(num_seeds, 0.0f);
+
+            for (size_t si = 0; si < num_seeds; ++si)
             {
+                const uint64_t seed = seeds[si];
                 std::mt19937_64 rng(seed * 10000 + count);
-                auto net = HopfieldNetwork<DIM>::Create(rng());
 
+                // Generate and store all patterns
                 std::vector<float> patterns(count * N);
                 for (size_t p = 0; p < count; ++p)
                     GenerateRandomPattern<N>(patterns.data() + p * N, rng);
 
-                for (size_t p = 0; p < count; ++p)
-                    net->StorePattern(patterns.data() + p * N);
-
-                float noisy[N];
-                for (size_t p = 0; p < count; ++p)
+                // Select which pattern indices to test
+                std::vector<size_t> test_indices(count);
+                std::iota(test_indices.begin(), test_indices.end(), 0);
+                if (test_count < count)
                 {
-                    const float* orig = patterns.data() + p * N;
-                    (void)CorruptPattern<N>(orig, noisy, noise, rng);
-
-                    const size_t sweeps = net->Recall(noisy, 100);
-                    const float overlap = ComputeOverlap<N>(orig, noisy);
-                    total_overlap += overlap;
-                    total_sweeps += static_cast<float>(sweeps);
-                    if (overlap < min_overlap) min_overlap = overlap;
-                    ++total_tests;
+                    std::shuffle(test_indices.begin(), test_indices.end(), rng);
+                    test_indices.resize(test_count);
                 }
+
+                // Per-thread accumulators for OMP reduction
+                float par_overlap = 0.0f;
+                float par_min_ovlp = 2.0f;
+                float par_sweeps = 0.0f;
+
+                #pragma omp parallel reduction(+:par_overlap,par_sweeps) reduction(min:par_min_ovlp)
+                {
+                    // Each thread gets its own network copy (for vtx_state_ / sim_buf_)
+                    auto thread_net = HopfieldNetwork<DIM>::Create(seed * 10000 + count + 1);
+                    for (size_t p = 0; p < count; ++p)
+                        thread_net->StorePattern(patterns.data() + p * N);
+
+                    float noisy[N];
+
+                    #pragma omp for schedule(dynamic)
+                    for (size_t ti = 0; ti < test_count; ++ti)
+                    {
+                        const size_t p = test_indices[ti];
+                        const float* orig = patterns.data() + p * N;
+
+                        // Each thread needs its own RNG for corruption
+                        std::mt19937_64 thread_rng(seed * 10000 + count * 100 + p);
+                        (void)CorruptPattern<N>(orig, noisy, noise, thread_rng);
+
+                        const size_t sweeps = thread_net->Recall(noisy, 100);
+                        const float overlap = ComputeOverlap<N>(orig, noisy);
+                        par_overlap += overlap;
+                        par_sweeps += static_cast<float>(sweeps);
+                        if (overlap < par_min_ovlp) par_min_ovlp = overlap;
+                    }
+                }
+
+                seed_overlap[si] = par_overlap;
+                seed_min_ovlp[si] = par_min_ovlp;
+                seed_sweeps[si] = par_sweeps;
+            }
+
+            // Aggregate across seeds
+            float total_overlap = 0.0f;
+            float min_overlap = 2.0f;
+            float total_sweeps = 0.0f;
+            const size_t total_tests = num_seeds * test_count;
+            for (size_t si = 0; si < num_seeds; ++si)
+            {
+                total_overlap += seed_overlap[si];
+                total_sweeps += seed_sweeps[si];
+                if (seed_min_ovlp[si] < min_overlap) min_overlap = seed_min_ovlp[si];
             }
 
             const float mean_overlap = total_overlap / static_cast<float>(total_tests);
@@ -87,8 +139,9 @@ public:
             else if (mean_overlap < threshold)
                 dropped = true;
 
-            Tee(md, Fmt("| %5d | %9.4f | %8.4f | %6.1f |%s|\n",
-                static_cast<int>(count), mean_overlap, min_overlap, avg_sweeps, status));
+            const char* sampled = (test_count < count) ? "*" : " ";
+            Tee(md, Fmt("|%s%5d | %9.4f | %8.4f | %6.1f |%s|\n",
+                sampled, static_cast<int>(count), mean_overlap, min_overlap, avg_sweeps, status));
 
             if (mean_overlap < 0.50f && count > 4)
                 break;
@@ -107,7 +160,10 @@ public:
     }
 
 private:
-    static void PrintHeader(FILE* md)
+    size_t max_patterns_;
+    size_t max_test_samples_;
+
+    static void PrintHeader(FILE* md, size_t max_samples)
     {
         std::printf("\n--- [3/5] CapacityProbe ---\n");
 
@@ -121,7 +177,9 @@ private:
             std::fprintf(md, "Classical Hopfield capacity is ~0.14N. Modern Hopfield networks with\n");
             std::fprintf(md, "exponential energy functions theoretically achieve exponential capacity\n");
             std::fprintf(md, "in N. This diagnostic measures the empirical limit on the sparse hypercube\n");
-            std::fprintf(md, "topology with dual-mask connectivity (DIM nearest + reach shells).\n\n");
+            std::fprintf(md, "topology with Hamming-ball connectivity.\n\n");
+            std::fprintf(md, "At high pattern counts, a random sample of %zu patterns is tested per seed\n", max_samples);
+            std::fprintf(md, "rather than all M (marked with * in the table).\n\n");
             std::fprintf(md, "---\n\n");
             std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=%zu | beta=4.0 | noise=20%% | 3-seed avg {42,1042,2042}\n\n",
                          DIM, N, DIM / 2);
