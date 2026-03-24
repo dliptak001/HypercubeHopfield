@@ -32,7 +32,7 @@ Key classes:
 ## Conventions
 
 - OpenMP is enabled for parallelism; CMakeLists.txt handles compiler-specific flags
-- Source files are collected via `file(GLOB)` — new .cpp files in project root and readout/ are included
+- Source files are collected via `file(GLOB)` — new .cpp files in project root are included automatically
 - Header guards use `#pragma once`
 - All values in the pipeline are float
 - Tests and diagnostics should be run in Release mode (-ffast-math can cause divergent results in Debug)

@@ -5,15 +5,14 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)  # Prefer -std=c++23 over GNU extensions
 
-# Source collection via GLOB — new .cpp files in project root and readout/ are picked up automatically
+# Source collection via GLOB — new .cpp files in project root are picked up automatically
 file(GLOB SOURCES
         ${PROJECT_SOURCE_DIR}/*.cpp
-        ${PROJECT_SOURCE_DIR}/readout/*.cpp
 )
 
 add_executable(HypercubeHopfield ${SOURCES})
 
-target_include_directories(HypercubeHopfield PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/readout ${PROJECT_SOURCE_DIR}/diagnostics)
+target_include_directories(HypercubeHopfield PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
 
 # ——— Compiler-specific OpenMP handling ———
 if(MINGW)
@@ -57,9 +56,6 @@ endif()
 
 # ——— Examples ———
 # (uncomment as examples are added)
-# file(GLOB READOUT_SOURCES ${PROJECT_SOURCE_DIR}/readout/*.cpp)
-# set(CORE_SOURCES ${PROJECT_SOURCE_DIR}/HopfieldNetwork.cpp ${READOUT_SOURCES})
-#
-# add_executable(PatternRecall examples/PatternRecall.cpp ${CORE_SOURCES})
-# target_include_directories(PatternRecall PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/readout)
+# add_executable(PatternRecall examples/PatternRecall.cpp ${PROJECT_SOURCE_DIR}/HopfieldNetwork.cpp)
+# target_include_directories(PatternRecall PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
 # target_compile_options(PatternRecall PRIVATE $<$<CONFIG:Release>:-O3 -march=native -ffast-math> -Wall -Wextra -Wno-unknown-pragmas)
