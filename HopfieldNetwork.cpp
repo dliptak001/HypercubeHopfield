@@ -68,7 +68,7 @@ void HopfieldNetwork<DIM>::Initialize()
     patterns_t_.clear();
     patterns_dirty_ = true;
     sim_buf_.clear();
-    std::fill(vtx_state_, vtx_state_ + N, 1.0f);
+    std::memset(vtx_state_, 0, sizeof(vtx_state_));
     num_patterns_ = 0;
 }
 
@@ -93,10 +93,6 @@ void HopfieldNetwork<DIM>::EnsureTransposed() const
 template <size_t DIM>
 void HopfieldNetwork<DIM>::StorePattern(const float* pattern)
 {
-#ifndef NDEBUG
-    for (size_t i = 0; i < N; ++i)
-        assert(pattern[i] == 1.0f || pattern[i] == -1.0f);
-#endif
     patterns_.insert(patterns_.end(), pattern, pattern + N);
     ++num_patterns_;
     sim_buf_.resize(num_patterns_);
@@ -123,9 +119,9 @@ size_t HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
         for (size_t idx = 0; idx < N; ++idx)
         {
             const size_t v = perm[idx];
-            const float old_spin = vtx_state_[v];
+            const float old_val = vtx_state_[v];
             UpdateVertex(v);
-            if (vtx_state_[v] != old_spin)
+            if (std::fabs(vtx_state_[v] - old_val) > 1e-6f)
                 changed = true;
         }
 
@@ -215,7 +211,7 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
     //
     // Phase 2: Softmax with inverse temperature beta.
     //
-    // Phase 3: Weighted vote of patterns at vertex v, sign activation.
+    // Phase 3: Weighted vote of patterns at vertex v (continuous output).
 
     const uint32_t* masks = conn_masks_.data();
     const size_t num_masks = conn_masks_.size();
@@ -252,6 +248,5 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
     for (size_t mu = 0; mu < M; ++mu)
         h += (sim[mu] / sum_exp) * pt_v[mu];
 
-    // Sign activation
-    vtx_state_[v] = (h >= 0.0f) ? 1.0f : -1.0f;
+    vtx_state_[v] = h;
 }

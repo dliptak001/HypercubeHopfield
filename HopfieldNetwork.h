@@ -13,9 +13,9 @@
 /// Uses an exponential energy function with explicit pattern storage and
 /// softmax-attention retrieval, achieving exponential memory capacity in N.
 ///
-/// Each vertex stores a binary spin (+1/-1). The update rule computes a
+/// Each vertex stores a continuous-valued state. The update rule computes a
 /// softmax-weighted combination of stored patterns using local similarities
-/// through Hamming-ball neighbors, then applies sign activation.
+/// through Hamming-ball neighbors.
 ///
 /// Connectivity: each vertex connects to neighbors within Hamming distance
 /// `reach` (the Hamming ball of radius `reach`). The mask table is sorted by
@@ -62,11 +62,11 @@ public:
     HopfieldNetwork& operator=(const HopfieldNetwork&) = delete;
 
     /// @brief Store a pattern into the network (explicit storage, not Hebbian).
-    /// @param pattern Array of N floats, each +1 or -1.
+    /// @param pattern Array of N floats (continuous-valued).
     void StorePattern(const float* pattern);
 
     /// @brief Run asynchronous updates until convergence or max_steps.
-    /// @param state In/out: N-element spin array (+1/-1). Modified in place.
+    /// @param state In/out: N-element state array (continuous-valued). Modified in place.
     /// @param max_steps Maximum update sweeps before declaring non-convergence.
     /// @return Number of sweeps taken (< max_steps means converged).
     size_t Recall(float* state, size_t max_steps = 100);
