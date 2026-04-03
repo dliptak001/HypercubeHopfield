@@ -13,6 +13,8 @@
 #include <vector>
 #include <random>
 
+class ThreadPool; // defined in ThreadPool.h (included by .cpp only)
+
 /// Update mode for Recall().
 enum class UpdateMode : uint8_t
 {
@@ -176,10 +178,11 @@ public:
             new HopfieldNetwork(rng_seed, reach, beta, neighbor_fraction, tolerance));
     }
 
+    ~HopfieldNetwork() override;
     HopfieldNetwork(const HopfieldNetwork&) = delete;
     HopfieldNetwork& operator=(const HopfieldNetwork&) = delete;
-    HopfieldNetwork(HopfieldNetwork&&) = default;
-    HopfieldNetwork& operator=(HopfieldNetwork&&) = default;
+    HopfieldNetwork(HopfieldNetwork&&) noexcept;
+    HopfieldNetwork& operator=(HopfieldNetwork&&) noexcept;
 
     // --- IHopfieldNetwork overrides (span-based, size-validated) ---
 
@@ -275,8 +278,18 @@ private:
     std::vector<uint32_t> perm_; // reusable permutation array for Async Recall [N]
     std::vector<uint32_t> conn_masks_; // precomputed neighbor masks: popcount(m) <= reach_
 
+    // --- Threading ---
+    static constexpr size_t kParallelWorkThreshold = 500000;
+    mutable std::unique_ptr<ThreadPool> pool_;
+    mutable std::vector<float> thread_sim_bufs_; // [pool.NumThreads() * num_patterns_]
+
+    ThreadPool& EnsurePool() const;
+    void EnsureThreadSimBufs() const;
+    bool ShouldParallelize() const;
+
     void Initialize();
     void BuildMaskTable();
     void EnsureTransposed() const;
-    void UpdateVertex(size_t v, const float* read_state, float* write_state);
+    void UpdateVertex(size_t v, const float* read_state, float* write_state, float* sim);
+    float VertexEnergy(size_t v, const float* state, float* sim) const;
 };

@@ -2,6 +2,7 @@
 // Copyright 2026 David Liptak
 
 #include "HopfieldNetwork.h"
+#include "ThreadPool.h"
 
 #include <algorithm>
 #include <bit>
@@ -26,6 +27,12 @@ template class HopfieldNetwork<13>;
 template class HopfieldNetwork<14>;
 template class HopfieldNetwork<15>;
 template class HopfieldNetwork<16>;
+
+// --- Destructor and move (defined here where ThreadPool is complete) ---
+
+template <size_t DIM> HopfieldNetwork<DIM>::~HopfieldNetwork() = default;
+template <size_t DIM> HopfieldNetwork<DIM>::HopfieldNetwork(HopfieldNetwork&&) noexcept = default;
+template <size_t DIM> HopfieldNetwork<DIM>& HopfieldNetwork<DIM>::operator=(HopfieldNetwork&&) noexcept = default;
 
 // --- Construction and initialization ---
 
@@ -102,6 +109,30 @@ void HopfieldNetwork<DIM>::EnsureTransposed() const
     patterns_dirty_ = false;
 }
 
+// --- Threading helpers ---
+
+template <size_t DIM>
+ThreadPool& HopfieldNetwork<DIM>::EnsurePool() const
+{
+    if (!pool_)
+        pool_ = std::make_unique<ThreadPool>();
+    return *pool_;
+}
+
+template <size_t DIM>
+void HopfieldNetwork<DIM>::EnsureThreadSimBufs() const
+{
+    const size_t required = EnsurePool().NumThreads() * num_patterns_;
+    if (thread_sim_bufs_.size() != required)
+        thread_sim_bufs_.resize(required);
+}
+
+template <size_t DIM>
+bool HopfieldNetwork<DIM>::ShouldParallelize() const
+{
+    return N * conn_masks_.size() * num_patterns_ >= kParallelWorkThreshold;
+}
+
 // --- Core operations ---
 
 template <size_t DIM>
@@ -125,7 +156,7 @@ RecallResult HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps, Update
     if (mode == UpdateMode::Async)
     {
         // Async: sequential random-order updates, read and write same buffer.
-        // Guaranteed monotonic energy descent.
+        // Guaranteed monotonic energy descent. Not parallelizable (data dependency).
         for (size_t step = 0; step < max_steps; ++step)
         {
             std::shuffle(perm_.begin(), perm_.end(), rng_);
@@ -135,7 +166,7 @@ RecallResult HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps, Update
             {
                 const size_t v = perm_[idx];
                 const float old_val = state[v];
-                UpdateVertex(v, state, state);
+                UpdateVertex(v, state, state, sim_buf_.data());
                 if (std::fabs(state[v] - old_val) > tolerance_)
                     changed = true;
             }
@@ -153,80 +184,119 @@ RecallResult HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps, Update
     sync_buf_.resize(N);
     float* read_ptr = state;
     float* write_ptr = sync_buf_.data();
+    const bool parallel = ShouldParallelize();
 
     for (size_t step = 0; step < max_steps; ++step)
     {
         bool changed = false;
 
-        for (size_t v = 0; v < N; ++v)
+        if (parallel)
         {
-            UpdateVertex(v, read_ptr, write_ptr);
-            if (std::fabs(write_ptr[v] - read_ptr[v]) > tolerance_)
-                changed = true;
+            EnsureThreadSimBufs();
+            const size_t M = num_patterns_;
+            float* sim_base = thread_sim_bufs_.data();
+            std::atomic<bool> any_changed{false};
+            EnsurePool().ForEach(N, [&](size_t tid, size_t begin, size_t end) {
+                float* sim = sim_base + tid * M;
+                for (size_t v = begin; v < end; ++v)
+                {
+                    UpdateVertex(v, read_ptr, write_ptr, sim);
+                    if (std::fabs(write_ptr[v] - read_ptr[v]) > tolerance_)
+                        any_changed.store(true, std::memory_order_relaxed);
+                }
+            });
+            changed = any_changed.load();
+        }
+        else
+        {
+            for (size_t v = 0; v < N; ++v)
+            {
+                UpdateVertex(v, read_ptr, write_ptr, sim_buf_.data());
+                if (std::fabs(write_ptr[v] - read_ptr[v]) > tolerance_)
+                    changed = true;
+            }
         }
 
         std::swap(read_ptr, write_ptr);
 
         if (!changed)
         {
-            // Result is now in read_ptr after the swap
             if (read_ptr != state)
                 std::copy(read_ptr, read_ptr + N, state);
             return {step + 1, true};
         }
     }
 
-    // Did not converge -- result is in read_ptr after last swap
     if (read_ptr != state)
         std::copy(read_ptr, read_ptr + N, state);
     return {max_steps, false};
 }
 
 template <size_t DIM>
-std::optional<float> HopfieldNetwork<DIM>::Energy(const float* state) const
+float HopfieldNetwork<DIM>::VertexEnergy(size_t v, const float* state, float* sim) const
 {
-    // Modern Hopfield energy: per-vertex log-sum-exp of pattern similarities.
-    // Uses transposed pattern layout for cache-friendly access.
-    if (num_patterns_ == 0) return std::nullopt;
-    EnsureTransposed();
-
-    const float inv_beta = 1.0f / beta_;
+    // Per-vertex energy contribution: -[ max_sim + beta^-1 * log(sum_exp) ]
     const uint32_t* masks = conn_masks_.data();
     const size_t num_masks = conn_masks_.size();
     const size_t M = num_patterns_;
     const float* pt = patterns_t_.data();
-    float energy = 0.0f;
 
-    energy_buf_.resize(M);
-    float* sim = energy_buf_.data();
-
-    for (size_t v = 0; v < N; ++v)
+    std::memset(sim, 0, M * sizeof(float));
+    for (size_t c = 0; c < num_masks; ++c)
     {
-        // Zero sim buffer
-        std::memset(sim, 0, M * sizeof(float));
-
-        // Connection-outer, pattern-inner: each iteration is a saxpy
-        // sim[mu] += state[nb] * patterns_t[nb * M + mu]  (contiguous access)
-        for (size_t c = 0; c < num_masks; ++c)
-        {
-            const size_t nb = v ^ masks[c];
-            const float nb_state = state[nb];
-            const float* pt_nb = pt + nb * M;
-            for (size_t mu = 0; mu < M; ++mu)
-                sim[mu] += nb_state * pt_nb[mu];
-        }
-
-        // Find max for numerical stability
-        float max_sim = -std::numeric_limits<float>::max();
+        const size_t nb = v ^ masks[c];
+        const float nb_state = state[nb];
+        const float* pt_nb = pt + nb * M;
         for (size_t mu = 0; mu < M; ++mu)
-            if (sim[mu] > max_sim) max_sim = sim[mu];
+            sim[mu] += nb_state * pt_nb[mu];
+    }
 
-        // Log-sum-exp
-        float sum_exp = 0.0f;
-        for (size_t mu = 0; mu < M; ++mu)
-            sum_exp += std::exp(beta_ * (sim[mu] - max_sim));
+    float max_sim = -std::numeric_limits<float>::max();
+    for (size_t mu = 0; mu < M; ++mu)
+        if (sim[mu] > max_sim) max_sim = sim[mu];
 
-        energy -= max_sim + inv_beta * std::log(sum_exp);
+    float sum_exp = 0.0f;
+    for (size_t mu = 0; mu < M; ++mu)
+        sum_exp += std::exp(beta_ * (sim[mu] - max_sim));
+
+    return -(max_sim + (1.0f / beta_) * std::log(sum_exp));
+}
+
+template <size_t DIM>
+std::optional<float> HopfieldNetwork<DIM>::Energy(const float* state) const
+{
+    if (num_patterns_ == 0) return std::nullopt;
+    EnsureTransposed();
+
+    float energy;
+
+    if (ShouldParallelize())
+    {
+        EnsureThreadSimBufs();
+        auto& pool = EnsurePool();
+        const size_t nt = pool.NumThreads();
+        const size_t M = num_patterns_;
+        float* sim_base = thread_sim_bufs_.data();
+        std::vector<float> partial(nt, 0.0f);
+
+        pool.ForEach(N, [&](size_t tid, size_t begin, size_t end) {
+            float* sim = sim_base + tid * M;
+            float local = 0.0f;
+            for (size_t v = begin; v < end; ++v)
+                local += VertexEnergy(v, state, sim);
+            partial[tid] = local;
+        });
+
+        energy = 0.0f;
+        for (size_t i = 0; i < nt; ++i)
+            energy += partial[i];
+    }
+    else
+    {
+        energy_buf_.resize(num_patterns_);
+        energy = 0.0f;
+        for (size_t v = 0; v < N; ++v)
+            energy += VertexEnergy(v, state, energy_buf_.data());
     }
 
     return energy / static_cast<float>(N);
@@ -239,12 +309,14 @@ void HopfieldNetwork<DIM>::Clear()
 }
 
 template <size_t DIM>
-void HopfieldNetwork<DIM>::UpdateVertex(size_t v, const float* read_state, float* write_state)
+void HopfieldNetwork<DIM>::UpdateVertex(size_t v, const float* read_state, float* write_state, float* sim)
 {
     // Modern Hopfield update via softmax attention over stored patterns.
     // Uses transposed pattern layout + connection-outer loop for cache efficiency.
     //
     // read_state and write_state may alias (Async mode) or differ (Sync mode).
+    // sim is a caller-provided scratch buffer of size num_patterns_ (enables
+    // thread-safe parallel calls with per-thread buffers).
     //
     // Phase 1: Accumulate similarity to each pattern through Hamming-ball neighbors.
     //          sim[mu] += read_state[nb] * patterns_t[nb * M + mu]
@@ -257,7 +329,6 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v, const float* read_state, float
     const size_t num_masks = conn_masks_.size();
     const size_t M = num_patterns_;
     const float* pt = patterns_t_.data();
-    float* sim = sim_buf_.data();
 
     // Phase 1: similarity accumulation (connection-outer, pattern-inner)
     std::memset(sim, 0, M * sizeof(float));
