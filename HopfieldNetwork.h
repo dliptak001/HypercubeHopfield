@@ -25,10 +25,16 @@ struct RecallResult
 /// Allows runtime DIM selection -- SDK bindings (Python, etc.) hold a
 /// unique_ptr<IHopfieldNetwork> and dispatch through virtual calls.
 /// All buffer-accepting methods use std::span with runtime size validation.
+///
+/// @note Not thread-safe. A single instance must not be accessed concurrently.
+///       Create separate instances for concurrent use.
 class IHopfieldNetwork
 {
 public:
     virtual ~IHopfieldNetwork() = default;
+    IHopfieldNetwork() = default;
+    IHopfieldNetwork(IHopfieldNetwork&&) = default;
+    IHopfieldNetwork& operator=(IHopfieldNetwork&&) = default;
 
     // --- Topology ---
 
@@ -162,6 +168,8 @@ public:
 
     HopfieldNetwork(const HopfieldNetwork&) = delete;
     HopfieldNetwork& operator=(const HopfieldNetwork&) = delete;
+    HopfieldNetwork(HopfieldNetwork&&) = default;
+    HopfieldNetwork& operator=(HopfieldNetwork&&) = default;
 
     // --- IHopfieldNetwork overrides (span-based, size-validated) ---
 
@@ -251,7 +259,7 @@ private:
     mutable bool patterns_dirty_ = true; // true when patterns_t_ needs rebuild
     std::vector<float> sim_buf_; // reusable similarity buffer [num_patterns_] for Recall
     mutable std::vector<float> energy_buf_; // per-pattern similarity buffer for Energy() [num_patterns_]
-    std::vector<size_t> perm_; // reusable permutation array for Recall [N]
+    std::vector<uint32_t> perm_; // reusable permutation array for Recall [N]
     std::vector<uint32_t> conn_masks_; // precomputed neighbor masks: popcount(m) <= reach_
 
     void Initialize();

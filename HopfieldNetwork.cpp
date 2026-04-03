@@ -108,9 +108,10 @@ void HopfieldNetwork<DIM>::EnsureTransposed() const
 template <size_t DIM>
 void HopfieldNetwork<DIM>::StorePattern(const float* pattern)
 {
+    // Allocate first so OOM throws before mutating state.
     patterns_.insert(patterns_.end(), pattern, pattern + N);
+    sim_buf_.resize(num_patterns_ + 1);
     ++num_patterns_;
-    sim_buf_.resize(num_patterns_);
     patterns_dirty_ = true;
 }
 
