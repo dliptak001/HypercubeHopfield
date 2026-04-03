@@ -29,7 +29,7 @@ import numpy as np
 
 from ._core import UpdateMode, _HopfieldNetwork
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __all__ = ["HopfieldNetwork", "RecallResult", "UpdateMode", "__version__"]
 
 
