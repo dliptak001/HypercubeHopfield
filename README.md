@@ -31,12 +31,51 @@ table is sorted by Hamming distance (closest first) and optionally truncated by 
 `neighbor_fraction` parameter (0.0-1.0) for tunable sparsity.
 
 At DIM=8 (N=256) with default reach=DIM/2=4 (162 connections, 63% of vertices), the
-network stores 65,000+ patterns with perfect recall in 2 sweeps -- over 250x the
-vertex count.
+network stores thousands of patterns with perfect recall in 2-3 sweeps.
 
 The system is designed for DIM 4-16 (16 to 65536 neurons).
 
-## Building and Running
+## Quick Start
+
+### Python
+
+```bash
+pip install hypercube-hopfield
+```
+
+```python
+import numpy as np
+import hypercube_hopfield as hh
+
+net = hh.HopfieldNetwork(dim=8, seed=42)
+
+# Store random patterns
+patterns = np.random.randn(10, net.num_vertices).astype(np.float32)
+net.store_patterns(patterns)
+
+# Recall from a noisy cue
+cue = patterns[0] + np.random.randn(net.num_vertices).astype(np.float32) * 0.5
+result = net.recall(cue)
+print(f"Converged: {result.converged}, sweeps: {result.steps}")
+```
+
+Pre-built wheels for Python 3.10-3.13 on Windows, Linux, and macOS.
+See [docs/Python_SDK.md](docs/Python_SDK.md) for the full API reference.
+
+### C++
+
+```cpp
+#include "HopfieldNetwork.h"
+
+auto net = CreateHopfieldNetwork(/*dim=*/8, /*seed=*/42);
+net->StorePattern(pattern);                  // span<const float>, size N=256
+auto [steps, converged] = net->Recall(cue);  // modifies cue in place
+```
+
+Available via CMake FetchContent or find_package.
+See [docs/CPP_SDK.md](docs/CPP_SDK.md) for integration guide and full API reference.
+
+## Building from Source
 
 **Requirements:** C++23 compiler (GCC 13+, Clang 17+, MSVC 2022+), CMake 4.1+.
 
@@ -56,6 +95,9 @@ HypercubeHopfield/
   HopfieldNetwork.h/cpp    Modern Hopfield network (N = 2^DIM vertices)
   ThreadPool.h             Internal fork-join thread pool (not public API)
   main.cpp                 Entry point -- runs all diagnostics
+
+  .github/workflows/
+    wheels.yml             CI/CD: build and publish Python wheels to PyPI
 
   cmake/
     HypercubeHopfieldConfig.cmake.in   CMake package config template
@@ -78,6 +120,7 @@ HypercubeHopfield/
     bindings.cpp           Pybind11 C++ binding layer
     CMakeLists.txt         Python extension build config
     pyproject.toml         Package metadata and wheel build config
+    README.md              PyPI landing page
     tests/                 Python SDK test suite
 
   docs/
