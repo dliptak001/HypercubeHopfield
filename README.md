@@ -54,7 +54,11 @@ MinGW, GCC/Clang, and MSVC automatically.
 ```
 HypercubeHopfield/
   HopfieldNetwork.h/cpp    Modern Hopfield network (N = 2^DIM vertices)
+  ThreadPool.h             Internal fork-join thread pool (not public API)
   main.cpp                 Entry point -- runs all diagnostics
+
+  cmake/
+    HypercubeHopfieldConfig.cmake.in   CMake package config template
 
   diagnostics/
     Diagnostics.h          Runner for the diagnostics suite
@@ -70,6 +74,7 @@ HypercubeHopfield/
     HeteroAssociativeDemo  Diagnostic lookup (standalone exe + .md)
 
   docs/
+    CPP_SDK.md             C++ SDK consumer guide (FetchContent, API reference)
     HopfieldNetwork.md     Network architecture, connectivity, parameters
 ```
 
@@ -77,6 +82,7 @@ HypercubeHopfield/
 
 | Document | Covers |
 |----------|--------|
+| [docs/CPP_SDK.md](docs/CPP_SDK.md) | C++ SDK: FetchContent, find_package, API reference |
 | [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md) | Hypercube connectivity, Hamming-ball masks, update rule, energy function, parameters |
 | [examples/AutoAssociativeDemo.md](examples/AutoAssociativeDemo.md) | Sensor fault recovery -- noise tolerance and dropout resilience |
 | [examples/HeteroAssociativeDemo.md](examples/HeteroAssociativeDemo.md) | Diagnostic lookup -- input-output mapping, noise, ambiguous inputs |

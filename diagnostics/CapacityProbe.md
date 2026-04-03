@@ -16,7 +16,7 @@ rather than all M (marked with * in the table).
 
 ---
 
-Run: DIM=8 | N=256 | reach=4 | beta=4.0 | noise=20% | ceiling=8192 | 3-seed avg {42,1042,2042}
+Run: DIM=8 | N=256 | reach=4 | beta=4.0 | noise=20% | ceiling=64 | 3-seed avg {42,1042,2042}
 
 ## Results
 
@@ -34,20 +34,13 @@ Run: DIM=8 | N=256 | reach=4 | beta=4.0 | noise=20% | ceiling=8192 | 3-seed avg 
 |    32 |    1.0000 |   1.0000 |    2.0 |  PASS  |
 |    48 |    1.0000 |   1.0000 |    2.0 |  PASS  |
 |    64 |    1.0000 |   1.0000 |    2.0 |  PASS  |
-|*  128 |    1.0000 |   1.0000 |    2.0 |  PASS  |
-|*  256 |    1.0000 |   1.0000 |    2.0 |  PASS  |
-|*  512 |    1.0000 |   1.0000 |    2.0 |  PASS  |
-|* 1024 |    1.0000 |   1.0000 |    2.0 |  PASS  |
-|* 2048 |    1.0000 |   1.0000 |    2.0 |  PASS  |
-|* 4096 |    1.0000 |   1.0000 |    2.0 |  PASS  |
-|* 8192 |    1.0000 |   1.0000 |    2.0 |  PASS  |
 
-Capacity (overlap >= 90%): 8192+ patterns (3200.00% of N=256)
+Capacity (overlap >= 90%): 64+ patterns (25.00% of N=256)
 (ceiling reached -- increase max_patterns to probe higher)
 Result: **PASS**
 
 ## Findings
 
-- **Capacity: 8192+ patterns (ceiling reached).** The network showed perfect
+- **Capacity: 64+ patterns (ceiling reached).** The network showed perfect
   recall at all tested counts. The true capacity is higher -- increase
   max_patterns to probe further.

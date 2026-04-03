@@ -82,7 +82,15 @@ The softmax concentrates attention on the pattern most similar to the
 local neighborhood, enabling sharp retrieval even with many stored patterns.
 Higher beta gives more winner-take-all behavior; lower beta gives softer blending.
 
-Updates are asynchronous (one vertex at a time, random order).
+Two update modes are supported:
+
+- **Sync** (default): All vertices read from the same snapshot and write to a
+  separate buffer (double-buffered). Vertex order is irrelevant -- each update
+  is independent. Deterministic and GPU-portable. Internally multithreaded for
+  large workloads.
+- **Async**: Vertices update one at a time in random order, reading and writing
+  the same buffer. Guaranteed monotonic energy descent per sweep. Not
+  parallelizable due to data dependencies between vertex updates.
 
 ## Energy Function
 

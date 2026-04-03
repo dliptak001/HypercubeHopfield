@@ -8,12 +8,46 @@
 /// learns paired associations and recalls the output from a partial query.
 
 #include "HopfieldNetwork.h"
-#include "diagnostics/DiagnosticHelpers.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <random>
 #include <vector>
+
+// --- Local helpers (self-contained example, no diagnostic includes) ---
+
+template <size_t N>
+static void GenerateRandomPattern(float* out, std::mt19937_64& rng)
+{
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+    for (size_t i = 0; i < N; ++i)
+        out[i] = dist(rng);
+}
+
+template <size_t N>
+static void CorruptPattern(const float* original, float* noisy,
+                           float noise_level, std::mt19937_64& rng)
+{
+    std::normal_distribution<float> gauss(0.0f, noise_level);
+    std::copy(original, original + N, noisy);
+    for (size_t i = 0; i < N; ++i)
+        noisy[i] += gauss(rng);
+}
+
+template <size_t N>
+static float ComputeOverlap(const float* a, const float* b)
+{
+    float dot = 0.0f, norm_a = 0.0f, norm_b = 0.0f;
+    for (size_t i = 0; i < N; ++i)
+    {
+        dot += a[i] * b[i];
+        norm_a += a[i] * a[i];
+        norm_b += b[i] * b[i];
+    }
+    const float denom = std::sqrt(norm_a * norm_b);
+    return (denom > 1e-12f) ? dot / denom : 0.0f;
+}
 
 static constexpr size_t DIM = 8;
 static constexpr size_t N = 1ULL << DIM;
