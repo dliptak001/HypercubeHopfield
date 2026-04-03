@@ -6,6 +6,6 @@
 int main()
 {
     constexpr size_t DIM = 8;
-    const bool pass = RunDiagnostics<DIM>();
+    const bool pass = SmokeTest<DIM>();
     return pass ? 0 : 1;
 }

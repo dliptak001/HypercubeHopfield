@@ -12,9 +12,10 @@
 
 /// Run all diagnostics for a given DIM. Prints results to stdout and writes
 /// individual .md result files to diagnostics/.
+/// @param capacity_ceiling Max patterns for CapacityProbe (0 = default).
 /// Returns true if all pass/fail checks passed.
 template <size_t DIM>
-bool RunDiagnostics()
+bool RunDiagnostics(size_t capacity_ceiling = 0)
 {
     constexpr size_t N = 1ULL << DIM;
 
@@ -26,7 +27,9 @@ bool RunDiagnostics()
     bool all_pass = true;
     all_pass &= NoiseRecall<DIM>().RunAndPrint();
     all_pass &= EnergyMonotonicity<DIM>().RunAndPrint();
-    all_pass &= CapacityProbe<DIM>().RunAndPrint();
+    all_pass &= (capacity_ceiling > 0)
+        ? CapacityProbe<DIM>(capacity_ceiling).RunAndPrint()
+        : CapacityProbe<DIM>().RunAndPrint();
     all_pass &= OverlapMetrics<DIM>().RunAndPrint();
 
     std::printf("\n============================================================\n");
@@ -34,4 +37,11 @@ bool RunDiagnostics()
     std::printf("============================================================\n");
 
     return all_pass;
+}
+
+/// Fast smoke test: runs all diagnostics with CapacityProbe ceiling=64.
+template <size_t DIM>
+bool SmokeTest()
+{
+    return RunDiagnostics<DIM>(64);
 }
