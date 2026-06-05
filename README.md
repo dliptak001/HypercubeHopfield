@@ -4,8 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/hypercube-hopfield)](https://pypi.org/project/hypercube-hopfield/)
 
 A sparse local-attention variant of the Modern Hopfield network built on a
-hypercube graph. Uses softmax-attention retrieval with Hamming-ball connectivity for
-a deliberate tradeoff: lower per-update cost than fully-connected Hopfield networks
+hypercube graph. Uses softmax-attention retrieval with Hamming-ball connectivity. Lower per-update cost than fully-connected Hopfield networks
 while retaining capacity that scales super-linearly with dimension.
 
 Licensed under the [Apache License 2.0](LICENSE).
