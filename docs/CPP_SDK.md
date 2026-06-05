@@ -68,7 +68,7 @@ include(FetchContent)
 FetchContent_Declare(
     HypercubeHopfield
     GIT_REPOSITORY https://github.com/dliptak001/HypercubeHopfield.git
-    GIT_TAG        v0.1.0
+    GIT_TAG        v1.0.0
 )
 FetchContent_MakeAvailable(HypercubeHopfield)
 
@@ -81,7 +81,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-Pin `GIT_TAG` to a release tag (e.g., `v0.1.0`) for reproducible builds.
+Pin `GIT_TAG` to a release tag (e.g., `v1.0.0`) for reproducible builds.
 Include paths are set automatically -- use `#include "HopfieldNetwork.h"`.
 
 > **Note:** FetchContent exposes the project root as an include path, so the
