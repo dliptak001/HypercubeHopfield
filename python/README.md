@@ -1,7 +1,37 @@
-# HypercubeHopfield: Modern Hopfield Associative Memory
+# HypercubeHopfield
 
-Pattern storage and recall on Boolean hypercube graphs, with exponential
-capacity and softmax attention over sparse Hamming-ball neighborhoods.
+**HypercubeHopfield** — modern Hopfield associative memory on a Boolean
+hypercube. Neurons sit on the vertices of a dim-dimensional cube
+(`N = 2^dim`). Patterns are stored **explicitly** and retrieved by **softmax
+attention** over a sparse neighborhood — not collapsed into a Hebbian weight
+matrix, and not full all-to-all modern-Hopfield attention either.
+
+**A topology you don't store.** Connectivity is the mask table of the Hamming
+ball — one XOR per neighbor, no adjacency list, at any size. Each vertex
+attends only inside that ball; cost scales with connections, not with the full cube.
+
+---
+
+<p align="center">
+  <strong>HypercubeAI ecosystem</strong><br/>
+  <sub>One geometry. Three libraries. Topology-native intelligence.</sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/dliptak001/HypercubeESN"><strong>HypercubeESN</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeCNN"><strong>HypercubeCNN</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
+</p>
+
+HypercubeHopfield is a pillar of **HypercubeAI** — a family of tools that treat the
+Boolean hypercube as a first-class computational medium: dynamical reservoirs
+(**ESN**), convolutional learning on the same graph (**CNN**), and associative
+memory (**Hopfield**). Shared vertices, shared XOR neighborhoods, no bolted-on
+grid.
+
+---
 
 ## Installation
 
@@ -9,33 +39,40 @@ capacity and softmax attention over sparse Hamming-ball neighborhoods.
 pip install hypercube-hopfield
 ```
 
+Pre-built wheels for **Python 3.10–3.13** on Windows, Linux, and macOS.
+NumPy is the only runtime dependency.
+
+Build from source (C++23 + CMake): see the
+[Python SDK guide](https://github.com/dliptak001/HypercubeHopfield/blob/main/docs/Python_SDK.md).
+
 ## Quick Start
 
 ```python
 import numpy as np
 import hypercube_hopfield as hh
 
-# Create a network with 256 neurons (dim=8, N=2^8)
+# 256 neurons (dim=8, N=2^8)
 net = hh.HopfieldNetwork(dim=8, seed=42)
 
-# Store some patterns
 patterns = np.random.randn(10, net.num_vertices).astype(np.float32)
 net.store_patterns(patterns)
 
-# Recall from a noisy cue
 cue = patterns[0] + np.random.randn(net.num_vertices).astype(np.float32) * 0.3
 result = net.recall(cue)
 print(f"Converged: {result.converged}, steps: {result.steps}")
+# result.state is the cleaned recall; input cue is not modified
 ```
 
 ## Features
 
-- **Explicit pattern storage** with exponential capacity
-- **Softmax attention** over sparse Hamming-ball neighborhoods
-- **Two update modes**: Sync (deterministic, GPU-portable) and Async (guaranteed energy descent)
-- **Pickle support** for saving/loading networks
-- **NumPy integration** with automatic float32 conversion
+- **Explicit pattern storage** — modern Hopfield retrieval without a Hebbian weight matrix
+- **Sparse Hamming-ball attention** — `reach` and `neighbor_fraction` control connectivity and cost
+- **Two update modes** — Sync (default, deterministic) and Async (guaranteed energy descent)
+- **Pickle / `save` / `load`** — persist config and all stored patterns
+- **NumPy integration** — automatic float32 conversion; `recall` does not mutate the cue
 
 ## Documentation
 
-See [Python SDK Reference](https://github.com/dliptak001/HypercubeHopfield/blob/main/docs/Python_SDK.md) for the full API.
+- [Python SDK Reference](https://github.com/dliptak001/HypercubeHopfield/blob/main/docs/Python_SDK.md) — full API, persistence, errors
+- [Project README](https://github.com/dliptak001/HypercubeHopfield) — architecture framing, C++ quick start, build
+- [HopfieldNetwork architecture](https://github.com/dliptak001/HypercubeHopfield/blob/main/docs/HopfieldNetwork.md) — connectivity, energy, parameters

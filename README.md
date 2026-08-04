@@ -2,10 +2,19 @@
 
 [![Build wheels](https://github.com/dliptak001/HypercubeHopfield/actions/workflows/wheels.yml/badge.svg)](https://github.com/dliptak001/HypercubeHopfield/actions/workflows/wheels.yml)
 [![PyPI](https://img.shields.io/pypi/v/hypercube-hopfield)](https://pypi.org/project/hypercube-hopfield/)
+[![Python](https://img.shields.io/pypi/pyversions/hypercube-hopfield)](https://pypi.org/project/hypercube-hopfield/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 
-A sparse local-attention variant of the Modern Hopfield network built on a
-hypercube graph. Uses softmax-attention retrieval with Hamming-ball connectivity. Lower per-update cost than fully-connected Hopfield networks
-while retaining capacity that scales super-linearly with dimension.
+**HypercubeHopfield** — modern Hopfield associative memory on a Boolean
+hypercube. Neurons sit on the vertices of a dim-dimensional cube
+(`N = 2^dim`). Patterns are stored **explicitly** and retrieved by **softmax
+attention** over a sparse neighborhood — not collapsed into a Hebbian weight
+matrix, and not full all-to-all modern-Hopfield attention either.
+
+**A topology you don't store.** Connectivity is the mask table of the Hamming
+ball — one XOR per neighbor, no adjacency list, at any size. Each vertex
+attends only inside that ball; cost scales with connections, not with the full cube.
 
 ---
 
@@ -30,35 +39,6 @@ grid.
 
 ---
 
-## What is a Modern Hopfield Network?
-
-Classical Hopfield networks store patterns via Hebbian learning into a weight matrix
-and retrieve them by converging from noisy cues. Their capacity is limited to ~0.14N
-patterns due to cross-talk interference.
-
-Modern Hopfield networks (Ramsauer et al., 2021) replace the quadratic energy function
-with a log-sum-exp (exponential) energy, and store patterns explicitly rather than
-collapsing them into weights. Retrieval uses softmax attention -- mathematically
-equivalent to the transformer attention mechanism. This achieves exponential
-capacity in N, far exceeding the classical limit.
-
-## What is HypercubeHopfield?
-
-HypercubeHopfield implements a Modern Hopfield network where the connectivity is
-defined by a hypercube of dimension DIM, giving N = 2^DIM vertices (neurons).
-Vertices are addressed by DIM-bit binary strings; each holds a continuous-valued state.
-
-Each vertex connects to all neighbors within a **Hamming ball** of configurable radius.
-Neighbor lookup is a single XOR instruction -- no adjacency list is stored. The mask
-table is sorted by Hamming distance (closest first) and optionally truncated by a
-`neighbor_fraction` parameter (0.0-1.0) for tunable sparsity.
-
-At DIM=8 (N=256) with default reach=DIM/2=4 (162 connections, 63% of vertices), the
-network stores 65,000+ patterns with perfect recall in 2 sweeps -- over 250x the
-vertex count.
-
-The system is designed for DIM 4-16 (16 to 65536 neurons).
-
 ## Quick Start
 
 ### Python
@@ -73,18 +53,16 @@ import hypercube_hopfield as hh
 
 net = hh.HopfieldNetwork(dim=8, seed=42)
 
-# Store random patterns
 patterns = np.random.randn(10, net.num_vertices).astype(np.float32)
 net.store_patterns(patterns)
 
-# Recall from a noisy cue
 cue = patterns[0] + np.random.randn(net.num_vertices).astype(np.float32) * 0.5
 result = net.recall(cue)
 print(f"Converged: {result.converged}, sweeps: {result.steps}")
 ```
 
-Pre-built wheels for Python 3.10-3.13 on Windows, Linux, and macOS.
-See [docs/Python_SDK.md](docs/Python_SDK.md) for the full API reference.
+Pre-built wheels for Python 3.10–3.13 on Windows, Linux, and macOS.
+Full API: [docs/Python_SDK.md](docs/Python_SDK.md).
 
 ### C++
 
@@ -92,12 +70,49 @@ See [docs/Python_SDK.md](docs/Python_SDK.md) for the full API reference.
 #include "HopfieldNetwork.h"
 
 auto net = CreateHopfieldNetwork(/*dim=*/8, /*seed=*/42);
-net->StorePattern(pattern);                  // span<const float>, size N=256
+net->StorePattern(pattern);                  // span<const float>, size N = 256
 auto [steps, converged] = net->Recall(cue);  // modifies cue in place
 ```
 
-Available via CMake FetchContent or find_package.
-See [docs/CPP_SDK.md](docs/CPP_SDK.md) for integration guide and full API reference.
+CMake FetchContent or `find_package`. Guide:
+[docs/CPP_SDK.md](docs/CPP_SDK.md).
+
+---
+
+## How this differs
+
+**Classical Hopfield** folds patterns into a weight matrix (Hebbian) and
+converges under a quadratic energy. Cross-talk in that matrix is the bottleneck.
+
+**Modern Hopfield** (Ramsauer et al., 2021) keeps patterns explicit and retrieves
+with a log-sum-exp energy — mathematically the same softmax attention as a
+transformer. The usual formulation is fully connected over the state.
+
+**HypercubeHopfield** keeps the modern energy and explicit storage, but wires
+each vertex only to its **Hamming ball**. Neighbor lookup is XOR against a
+shared mask table (sorted closest-first, optionally truncated). Cost is
+**O(M × connections)** per vertex, on a cube you can grow to DIM 4–16
+(16 … 65,536 neurons).
+
+Sync updates (default) are double-buffered, deterministic, and threaded.
+Async updates guarantee monotonic energy descent. Both stop when no vertex
+moves more than `tolerance`.
+
+Deep dive: [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md).
+
+---
+
+## Documentation
+
+| Document | Covers |
+|----------|--------|
+| [docs/CPP_SDK.md](docs/CPP_SDK.md) | C++ SDK: FetchContent, find_package, API reference |
+| [docs/Python_SDK.md](docs/Python_SDK.md) | Python SDK: installation, API reference, persistence |
+| [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md) | Connectivity, update rule, energy, parameters |
+| [examples/AutoAssociativeDemo.md](examples/AutoAssociativeDemo.md) | Sensor fault recovery — noise and dropout |
+| [examples/HeteroAssociativeDemo.md](examples/HeteroAssociativeDemo.md) | Diagnostic lookup — input→output association |
+
+---
 
 ## Building from Source
 
@@ -109,56 +124,21 @@ cmake --build build
 ./build/HypercubeHopfield
 ```
 
-No external dependencies beyond the C++ standard library. The build system detects
-MinGW, GCC/Clang, and MSVC automatically.
+No external dependencies beyond the C++ standard library. MinGW, GCC/Clang, and
+MSVC are detected automatically. The main binary runs the diagnostics suite;
+example targets build from `examples/`.
 
-## Project Structure
+---
+
+## Layout
 
 ```
 HypercubeHopfield/
-  HopfieldNetwork.h/cpp    Modern Hopfield network (N = 2^DIM vertices)
-  ThreadPool.h             Internal fork-join thread pool (not public API)
-  main.cpp                 Entry point -- runs all diagnostics
-
-  .github/workflows/
-    wheels.yml             CI/CD: build and publish Python wheels to PyPI
-
-  cmake/
-    HypercubeHopfieldConfig.cmake.in   CMake package config template
-
-  diagnostics/
-    Diagnostics.h          Runner for the diagnostics suite
-    DiagnosticHelpers.h    Shared utilities (pattern gen, corruption, overlap)
-    NoiseRecall.h          Single-pattern recall at varying noise levels
-    EnergyMonotonicity.h   Verify energy is non-increasing across sweeps
-    CapacityProbe.h        Find empirical capacity ceiling
-    OverlapMetrics.h       Per-pattern overlap and cross-interference
-    *.md                   Auto-generated result files from each diagnostic
-
-  examples/
-    AutoAssociativeDemo    Sensor fault recovery (standalone exe + .md)
-    HeteroAssociativeDemo  Diagnostic lookup (standalone exe + .md)
-
-  python/
-    hypercube_hopfield/    Python SDK package (pip install hypercube-hopfield)
-    bindings.cpp           Pybind11 C++ binding layer
-    CMakeLists.txt         Python extension build config
-    pyproject.toml         Package metadata and wheel build config
-    README.md              PyPI landing page
-    tests/                 Python SDK test suite
-
-  docs/
-    CPP_SDK.md             C++ SDK consumer guide (FetchContent, API reference)
-    Python_SDK.md          Python SDK reference (installation, API, persistence)
-    HopfieldNetwork.md     Network architecture, connectivity, parameters
+  HopfieldNetwork.h/cpp   Public core API
+  main.cpp                Diagnostics entry point
+  diagnostics/            Noise, energy, overlap, and related probes
+  examples/               Auto- and heteroassociative demos
+  python/                 PyPI package (hypercube-hopfield)
+  docs/                   Architecture + C++/Python SDK
+  cmake/                  Install / package config
 ```
-
-## Documentation
-
-| Document | Covers |
-|----------|--------|
-| [docs/CPP_SDK.md](docs/CPP_SDK.md) | C++ SDK: FetchContent, find_package, API reference |
-| [docs/Python_SDK.md](docs/Python_SDK.md) | Python SDK: installation, API reference, persistence |
-| [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md) | Hypercube connectivity, Hamming-ball masks, update rule, energy function, parameters |
-| [examples/AutoAssociativeDemo.md](examples/AutoAssociativeDemo.md) | Sensor fault recovery -- noise tolerance and dropout resilience |
-| [examples/HeteroAssociativeDemo.md](examples/HeteroAssociativeDemo.md) | Diagnostic lookup -- input-output mapping, noise, ambiguous inputs |
