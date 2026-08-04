@@ -8,7 +8,28 @@ hypercube graph. Uses softmax-attention retrieval with Hamming-ball connectivity
 a deliberate tradeoff: lower per-update cost than fully-connected Hopfield networks
 while retaining capacity that scales super-linearly with dimension.
 
-Licensed under the [Apache License 2.0](LICENSE).
+---
+
+<p align="center">
+  <strong>HypercubeAI ecosystem</strong><br/>
+  <sub>One geometry. Three libraries. Topology-native intelligence.</sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/dliptak001/HypercubeESN"><strong>HypercubeESN</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeCNN"><strong>HypercubeCNN</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
+</p>
+
+HypercubeHopfield is a pillar of **HypercubeAI** — a family of tools that treat the
+Boolean hypercube as a first-class computational medium: dynamical reservoirs
+(**ESN**), convolutional learning on the same graph (**CNN**), and associative
+memory (**Hopfield**). Shared vertices, shared XOR neighborhoods, no bolted-on
+grid.
+
+---
 
 ## What is a Modern Hopfield Network?
 
