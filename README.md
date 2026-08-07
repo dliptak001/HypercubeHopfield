@@ -8,19 +8,21 @@
 
 **HypercubeHopfield** — modern Hopfield associative memory on a Boolean
 hypercube. Neurons sit on the vertices of a dim-dimensional cube
-(`N = 2^dim`). Patterns are stored **explicitly** and retrieved by **softmax
-attention** over a sparse neighborhood — not collapsed into a Hebbian weight
-matrix, and not full all-to-all modern-Hopfield attention either.
+(`N = 2^dim`). Patterns are stored **explicitly** and retrieved by
+**softmax attention** over a sparse neighborhood — not collapsed into a
+Hebbian weight matrix, and not full all-to-all modern-Hopfield attention
+either.
 
-**A topology you don't store.** Connectivity is the mask table of the Hamming
-ball — one XOR per neighbor, no adjacency list, at any size. Each vertex
-attends only inside that ball; cost scales with connections, not with the full cube.
+**A topology you don't store.** Connectivity is the mask table of the
+Hamming ball — one XOR per neighbor, no adjacency list, at any size.
+Each vertex attends only inside that ball; cost scales with connections,
+not with the full cube.
 
 ---
 
 <p align="center">
   <strong>HypercubeAI ecosystem</strong><br/>
-  <sub>One geometry. Three libraries. Topology-native intelligence.</sub>
+  <sub>One geometry. Topology-native intelligence.</sub>
 </p>
 
 <p align="center">
@@ -29,13 +31,38 @@ attends only inside that ball; cost scales with connections, not with the full c
   <a href="https://github.com/dliptak001/HypercubeCNN"><strong>HypercubeCNN</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
 </p>
 
-HypercubeHopfield is a pillar of **HypercubeAI** — a family of tools that treat the
-Boolean hypercube as a first-class computational medium: dynamical reservoirs
-(**ESN**), convolutional learning on the same graph (**CNN**), and associative
-memory (**Hopfield**). Shared vertices, shared XOR neighborhoods, no bolted-on
-grid.
+HypercubeHopfield is an experiment in the **HypercubeAI** project — our quest
+to map AI and ML strategies onto the hypercube as a computational substrate.
+
+Why the hypercube? A few properties keep showing up — and they explain why a
+frozen reservoir and a HypercubeCNN readout fit together so cleanly:
+
+- **A topology you don't store** — the graph is specified: connectivity is
+  implicit in the vertex indices; with a seed and a few config scalars the
+  whole reservoir reconstructs mathematically.
+- **Perfect homogeneity** — every vertex has the same degree and the same
+  local world, so local dynamics mean the same thing everywhere — no
+  structural favorites baked in by a random graph.
+- **Cheap navigation** — each neighbor is a few bit operations on the vertex
+  index, not a pointer chase through a stored edge list, so walks stay
+  arithmetic and cache-friendly.
+- **Topology-native pairing** — the readout consumes the reservoir's output
+  with zero geometric distortion, and the learned kernels exploit the same
+  locality that generated the dynamics. The data never leaves the hypercube
+  it was born on.
+
+Each product in the family is a different architecture on that same foundation:
+
+| Product | Natural data | Role of the hypercube |
+|---------|--------------|------------------------|
+| **[HypercubeESN](https://github.com/dliptak001/HypercubeESN)** | Low-dim **streams** over time | Frozen **reservoir** stepped each sample; multi-slice state → HypercubeCNN readout |
+| **[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN)** | Static patterns on the cube | Trainable **spatial** conv/pool on the cube (no recurrent reservoir) |
+| **[HypercubeHopfield](https://github.com/dliptak001/HypercubeHopfield)** | Patterns / attractors | Associative memory dynamics on the cube |
+| **[HypercubeWTF](https://github.com/dliptak001/HypercubeWTF)** | Static high-dim fields (**no** intrinsic time) | Same **frozen hypercube reservoir** discipline as ESN, driven for a short orbit per sample, then HypercubeCNN on the **end state** |
 
 ---
 
@@ -74,29 +101,30 @@ net->StorePattern(pattern);                  // span<const float>, size N = 256
 auto [steps, converged] = net->Recall(cue);  // modifies cue in place
 ```
 
-CMake FetchContent or `find_package`. Guide:
-[docs/CPP_SDK.md](docs/CPP_SDK.md).
+CMake FetchContent or `find_package`. Guide: [docs/CPP_SDK.md](docs/CPP_SDK.md).
 
 ---
 
 ## How this differs
 
 **Classical Hopfield** folds patterns into a weight matrix (Hebbian) and
-converges under a quadratic energy. Cross-talk in that matrix is the bottleneck.
+converges under a quadratic energy. Cross-talk in that matrix is the
+bottleneck.
 
-**Modern Hopfield** (Ramsauer et al., 2021) keeps patterns explicit and retrieves
-with a log-sum-exp energy — mathematically the same softmax attention as a
-transformer. The usual formulation is fully connected over the state.
+**Modern Hopfield** (Ramsauer et al., 2021) keeps patterns explicit and
+retrieves with a log-sum-exp energy — mathematically the same softmax
+attention as a transformer. The usual formulation is fully connected over
+the state.
 
-**HypercubeHopfield** keeps the modern energy and explicit storage, but wires
-each vertex only to its **Hamming ball**. Neighbor lookup is XOR against a
-shared mask table (sorted closest-first, optionally truncated). Cost is
-**O(M × connections)** per vertex, on a cube you can grow to DIM 4–16
-(16 … 65,536 neurons).
+**HypercubeHopfield** keeps the modern energy and explicit storage, but
+wires each vertex only to its **Hamming ball**. Neighbor lookup is XOR
+against a shared mask table (sorted closest-first, optionally truncated).
+Cost is **O(M × connections)** per vertex, on a cube you can grow to
+DIM 4–16 (16 … 65,536 neurons).
 
 Sync updates (default) are double-buffered, deterministic, and threaded.
-Async updates guarantee monotonic energy descent. Both stop when no vertex
-moves more than `tolerance`.
+Async updates guarantee monotonic energy descent. Both stop when no
+vertex moves more than `tolerance`.
 
 Deep dive: [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md).
 
@@ -124,9 +152,9 @@ cmake --build build
 ./build/HypercubeHopfield
 ```
 
-No external dependencies beyond the C++ standard library. MinGW, GCC/Clang, and
-MSVC are detected automatically. The main binary runs the diagnostics suite;
-example targets build from `examples/`.
+No external dependencies beyond the C++ standard library. MinGW, GCC/Clang,
+and MSVC are detected automatically. The main binary runs the diagnostics
+suite; example targets build from `examples/`.
 
 ---
 
