@@ -25,19 +25,21 @@ not with the full cube.
 </p>
 
 <p align="center">
-  <a href="https://github.com/dliptak001/HypercubeESN"><strong>HypercubeESN</strong></a>
+  <a href="https://github.com/dliptak001/HypercubeCascade"><strong>HypercubeCascade</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeCNN"><strong>HypercubeCNN</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
+  <a href="https://github.com/dliptak001/HypercubeESN"><strong>HypercubeESN</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeEtalon"><strong>HypercubeEtalon</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/dliptak001/HypercubeCascade"><strong>HypercubeCascade</strong></a>
+  <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeLCN"><strong>HypercubeLCN</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeWorldModel"><strong>HypercubeWorldModel</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
 </p>
 
 <p align="center">

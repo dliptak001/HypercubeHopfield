@@ -1,5 +1,11 @@
 # HypercubeHopfield
 
+[![Build wheels](https://github.com/dliptak001/HypercubeHopfield/actions/workflows/wheels.yml/badge.svg)](https://github.com/dliptak001/HypercubeHopfield/actions/workflows/wheels.yml)
+[![PyPI](https://img.shields.io/pypi/v/hypercube-hopfield)](https://pypi.org/project/hypercube-hopfield/)
+[![Python](https://img.shields.io/pypi/pyversions/hypercube-hopfield)](https://pypi.org/project/hypercube-hopfield/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/dliptak001/HypercubeHopfield/blob/main/LICENSE)
+[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
+
 **HypercubeHopfield** — modern Hopfield associative memory on a Boolean
 hypercube. Neurons sit on the vertices of a dim-dimensional cube
 (`N = 2^dim`). Patterns are stored **explicitly** and retrieved by
@@ -19,19 +25,21 @@ not with the full cube.
 </p>
 
 <p align="center">
-  <a href="https://github.com/dliptak001/HypercubeESN"><strong>HypercubeESN</strong></a>
+  <a href="https://github.com/dliptak001/HypercubeCascade"><strong>HypercubeCascade</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeCNN"><strong>HypercubeCNN</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
+  <a href="https://github.com/dliptak001/HypercubeESN"><strong>HypercubeESN</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeEtalon"><strong>HypercubeEtalon</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/dliptak001/HypercubeCascade"><strong>HypercubeCascade</strong></a>
+  <a href="https://github.com/dliptak001/HypercubeHopfield"><strong>HypercubeHopfield</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dliptak001/HypercubeLCN"><strong>HypercubeLCN</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeWorldModel"><strong>HypercubeWorldModel</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dliptak001/HypercubeWTF"><strong>HypercubeWTF</strong></a>
 </p>
 
 <p align="center">
@@ -107,3 +115,14 @@ print(f"Converged: {result.converged}, steps: {result.steps}")
 - [Python SDK Reference](https://github.com/dliptak001/HypercubeHopfield/blob/main/docs/Python_SDK.md) — full API, persistence, errors
 - [Project README](https://github.com/dliptak001/HypercubeHopfield) — architecture framing, C++ quick start, build
 - [HopfieldNetwork architecture](https://github.com/dliptak001/HypercubeHopfield/blob/main/docs/HopfieldNetwork.md) — connectivity, energy, parameters
+
+## Ecosystem
+
+- **[HypercubeCascade](https://github.com/dliptak001/HypercubeCascade)**: two frozen stages in series plus a thin readout.
+- **[HypercubeCNN](https://github.com/dliptak001/HypercubeCNN)**: cube-native conv stack with shared kernels.
+- **[HypercubeESN](https://github.com/dliptak001/HypercubeESN)**: echo-state reservoir computing on streams.
+- **[HypercubeEtalon](https://github.com/dliptak001/HypercubeEtalon)**: frozen etalon transit plus a thin readout.
+- **[HypercubeHopfield](https://github.com/dliptak001/HypercubeHopfield)**: Hopfield-style dynamics on the cube.
+- **[HypercubeLCN](https://github.com/dliptak001/HypercubeLCN)**: the locally connected net, every weight trained.
+- **[HypercubeWorldModel](https://github.com/dliptak001/HypercubeWorldModel)**: frozen WTF encoder + trained LCN predictor and decoder.
+- **[HypercubeWTF](https://github.com/dliptak001/HypercubeWTF)**: frozen reservoir orbit plus a thin readout.
